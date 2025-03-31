@@ -1,0 +1,8 @@
+{
+  "ClusterIdentifier": "fraud-cluster",
+  "NodeType": "dc2.large",
+  "MasterUsername": "admin",
+  "MasterUserPassword": "Pankaj2024!",
+  "DBName": "frauddb",
+  "ClusterType": "single-node"
+}

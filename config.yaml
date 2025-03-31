@@ -1,0 +1,7 @@
+kafka:
+  topic: creditcard_topic
+  bootstrap_servers: localhost:9092
+
+aws:
+  redshift_cluster_id: fraud-cluster
+  s3_bucket: fraud-detection-pipeline-data
