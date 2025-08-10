@@ -16,7 +16,9 @@ producer.py streams transactions from a sample dataset (creditcard.csv) into a K
 A Spark Structured Streaming job (fraud_detector.py) reads from Kafka, generates features, and uses an XGBoost model to assign a fraud risk score to each transaction. Transactions over a set threshold are marked as potentially fraudulent.
 
 3. Adding explanations
-For flagged transactions, the stream calls a small FastAPI service (llm/service.py). This service can run in mock mode, or connect to AWS Bedrock or OpenAI, and returns:
+For flagged transactions, the stream calls a small FastAPI service (llm/service.py).
+
+This service can run in mock mode, or connect to AWS Bedrock or OpenAI, and returns:
 
 1. a short reason for why the transaction is suspicious
 2. suggested actions for the fraud team
