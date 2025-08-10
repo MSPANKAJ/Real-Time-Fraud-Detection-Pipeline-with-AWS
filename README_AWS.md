@@ -1,124 +1,66 @@
-# Real-Time Credit Card Fraud Detection Pipeline – AWS Deployment
+LLM Driven Fraud Detection Stream Processing System
+This project demonstrates a real-time fraud detection pipeline built on a streaming architecture. It shows how machine learning and large language models can work together to improve fraud alerts with both accuracy and context.
 
-This repository contains a complete, production-grade data engineering pipeline that detects fraudulent credit card transactions in real time. The project integrates Kafka, Spark Structured Streaming, AWS Lambda, Redshift, and Airflow to simulate a real-world streaming data use case.
+Overview
+The system ingests transaction data in real time, scores it for fraud risk, and sends alerts for suspicious activity. A traditional model (XGBoost) handles the fraud detection, while a lightweight LLM service generates plain-language explanations and recommended actions for flagged transactions.
 
----
+It is designed to be easy to follow for demonstration purposes. You can read the code and understand the flow without needing to spin up a large infrastructure stack.
 
-## Architecture Overview
+How It Works
+Data ingestion
+producer.py streams transactions from a sample dataset (creditcard.csv) into a Kafka topic called creditcard_topic.
 
-- **Apache Kafka**: Streams incoming credit card transactions.
-- **Apache Spark (Structured Streaming)**: Performs real-time fraud detection logic.
-- **AWS Lambda**: Sends fraud alerts when anomalies are identified.
-- **Amazon Redshift**: Stores cleaned and labeled transaction data.
-- **Apache Airflow**: Orchestrates the entire pipeline end-to-end.
+Real-time scoring
+A Spark Structured Streaming job (fraud_detector.py) reads from Kafka, generates features, and uses an XGBoost model to assign a fraud risk score to each transaction. Transactions over a set threshold are marked as potentially fraudulent.
 
----
+Adding explanations
+For flagged transactions, the stream calls a small FastAPI service (llm/service.py). This service can run in mock mode, or connect to AWS Bedrock or OpenAI, and returns:
 
-## Setup Summary (Fully Implemented)
+a short reason for why the transaction is suspicious
 
-### 1. S3 Bucket and Dataset Upload
+suggested actions for the fraud team
 
-Created S3 bucket and uploaded dataset from Kaggle:
-```bash
-aws s3 mb s3://fraud-stream-bucket
-aws s3 cp creditcard.csv s3://fraud-stream-bucket/
-```
+a confidence score for its explanation
 
-### 2. Spark Streaming on EMR
+The Spark helper in stream/llm_enricher.py attaches these fields to the transaction.
 
-- Configured an EMR cluster with Spark to run `fraud_detector.py`
-- Subscribed to Kafka topic for transaction stream ingestion
-- Used ML model logic to detect anomalies
-- Pushed flagged data to Amazon Redshift
+Alerting
+The enriched transaction is sent to an AWS Lambda function (lambda_function/send_alert.py) which sends an email alert through Amazon SES. The alert includes the model risk score, the LLM’s reason, and the recommended next steps.
 
-### 3. Airflow DAG Orchestration
+Storage and reporting
+The design includes storing scored transactions in S3 or Redshift for dashboards, drift monitoring, and retraining, with example Redshift configuration in redshift.json.
 
-- Deployed `fraud_detection_dag.py` to Airflow (via EC2 or MWAA)
-- DAG Tasks:
-  - Start Spark Streaming job
-  - Trigger Lambda for fraud alerts
-  - Archive processed files to S3
+Orchestration
+An example Airflow DAG (fraud_pipeline_dag.py) shows how the Spark job and alert step can be orchestrated for batch or demo runs.
 
-### 4. AWS Lambda Fraud Alert Setup
+Key Features
+Real-time processing of streaming transactions with Kafka and Spark
 
-Created and deployed Lambda function for real-time alerts:
-```bash
-zip lambda.zip lambda_handler.py
-aws lambda create-function   --function-name FraudAlertHandler   --runtime python3.9   --role arn:aws:iam::<ACCOUNT_ID>:role/lambda-exec-role   --handler lambda_handler.lambda_handler   --zip-file fileb://lambda.zip
-```
+XGBoost for high-precision fraud detection on tabular features
 
-Lambda ARN: `arn:aws:lambda:us-east-2:851725438992:function:FraudAlertHandler`
+Optional LLM-based explanations and recommendations for analysts
 
-### 5. Redshift Table Schema
+Email alerts sent through AWS SES via Lambda
 
-Executed the following SQL on Redshift:
-```sql
-CREATE TABLE fraud_detection (
-    time FLOAT,
-    v1 FLOAT, v2 FLOAT, v3 FLOAT, v4 FLOAT, v5 FLOAT, v6 FLOAT, v7 FLOAT, v8 FLOAT,
-    v9 FLOAT, v10 FLOAT, v11 FLOAT, v12 FLOAT, v13 FLOAT, v14 FLOAT, v15 FLOAT,
-    v16 FLOAT, v17 FLOAT, v18 FLOAT, v19 FLOAT, v20 FLOAT, v21 FLOAT, v22 FLOAT,
-    v23 FLOAT, v24 FLOAT, v25 FLOAT, v26 FLOAT, v27 FLOAT, v28 FLOAT,
-    amount FLOAT,
-    class INT
-);
-```
+Configurable through environment variables and simple YAML/JSON config files
 
-- Data ingestion handled via Spark connector or `COPY` command.
+Why the LLM Step Matters
+Before the LLM service was added, alerts were generic and left analysts to work out the reason for each flag. Now each alert includes a concise explanation of why the transaction is suspicious and what actions to take. This reduces investigation time and improves consistency in handling cases.
 
-### 6. Pipeline Execution Flow
+How to Read the Code
+This repo is meant to be read and discussed rather than deployed. The LLM service defaults to returning a mock explanation so you can see the flow without needing cloud API keys. The Spark job can run locally against a small Kafka setup to illustrate the data path.
 
-1. Kafka produces streaming transactions.
-2. Spark processes the stream and flags suspicious records.
-3. Redshift stores transaction records.
-4. Lambda triggers fraud alert logic.
-5. Airflow schedules and monitors the pipeline.
-
----
-
-## IAM Role Summary
-
-- **Lambda**: Read/write to S3 and CloudWatch logging
-- **EMR/Glue**: S3 access and Redshift write permissions
-- **Redshift**: IAM role with COPY permissions from S3 bucket via IAM Role
-
----
-
-## Dataset Reference
-
-Source: [Kaggle Credit Card Fraud Detection Dataset](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud)  
-- 284,807 transactions  
-- 492 frauds (highly imbalanced)  
-- Anonymized PCA features (V1 to V28)
-
----
-
-## Tech Stack
-
-- Python 3.9, PySpark
-- Apache Kafka, Spark Structured Streaming
-- AWS Lambda, Redshift, S3, EMR
-- Apache Airflow (EC2/MWAA)
-- IAM, Terraform (optional)
-
----
-
-## Contributing
-
-Contributions are welcome. You can suggest improvements, open issues, or submit pull requests for:
-- Monitoring integrations (Prometheus, Grafana)
-- Support for Kinesis or Athena
-- Real-time dashboards or visualization tools
-
----
-
-## Author
-
-**Pankaj M Sajjanar**  
-Data Engineer | [LinkedIn](https://www.linkedin.com/) | [GitHub](https://github.com/)
-
----
-
-## License
-
-This project is licensed under the MIT License.
+Folder Structure
+bash
+Copy
+Edit
+producer.py                  # Sends sample transactions to Kafka
+fraud_detector.py             # Spark job for feature gen + XGBoost scoring
+stream/llm_enricher.py        # Spark UDF that calls the LLM service
+llm/service.py                # FastAPI service that generates explanations
+lambda_function/send_alert.py # Lambda code to send SES email alerts
+fraud_pipeline_dag.py         # Airflow DAG to orchestrate Spark + alert steps
+config.yaml                   # Kafka and threshold config
+redshift.json                 # Example Redshift cluster config
+Intended Use
+This code is for learning and discussion. It is not production-ready and does not include full security, scaling, or deployment configuration. The focus is on showing how traditional ML and LLMs can be combined in a streaming fraud detection workflow.
